@@ -1,0 +1,30 @@
+{
+    "CodePipeline.job": {
+        "id": "d326fb54-8a03-4071-9349-6089eefd63f9",
+        "accountId": "353295783710",
+        "data": {
+            "actionConfiguration": {
+                "configuration": {
+                    "FunctionName": "myTestFunction",
+                    "UserParameters": "deploy-test"
+                }
+            },
+            "inputArtifacts": [
+                {
+                    "location": {
+                        "s3Location": {
+                            "bucketName": "ifc-jeffers",
+                            "objectKey": "aws-lambda-deployer-test/2TV9uVX.zip"
+                        },
+                        "type": "S3"
+                    },
+                    "revision": null,
+                    "name": "MyAppBuild"
+                }
+            ],
+            "outputArtifacts": [],
+
+            "continuationToken": ""
+        }
+    }
+}

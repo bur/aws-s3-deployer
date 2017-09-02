@@ -1,0 +1,25 @@
+version: 0.1
+
+phases:
+  install:
+    commands:
+      - echo Install started on `date`
+      - npm install -g gulp
+      - npm install -g mocha
+  pre_build:
+    commands:
+      - echo Pre build started on `date`
+      - npm install
+      - ln -s node_modules/serverless/bin/serverless serverless
+  build:
+    commands:
+      - echo Build started on `date`
+      - gulp mocha
+      - ./serverless deploy --stage $ENVIRONMENT --noDeploy
+  post_build:
+    commands:
+      - echo Nothing to do in the post build phase...
+artifacts:
+  files:
+    - .serverless/kubra-aws-lambda-deployer.zip
+    - serverless.yml

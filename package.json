@@ -1,0 +1,23 @@
+{
+  "name": "kubra.aws-lambda-deployer",
+  "version": "1.0.0",
+  "description": "This lambda function downloads the AWS Code Build artifacts from a Serverless Framework project, unzips the content, and executes the serverless deploy command.",
+  "main": "handler.js",
+  "scripts": {
+    "test": "gulp mocha"
+  },
+  "author": "Eric Jeffers <eric.jeffers@kubra.com>",
+  "devDependencies": {
+    "chai": "^3.5.0",
+    "gulp": "^3.8.11",
+    "gulp-mocha": "^2.0.1",
+    "lambda-tester": "^2.2.1",
+    "lambduh-gulp": "^0.1.0"
+  },
+  "dependencies": {
+    "aws-sdk": "^2.11.1",
+    "extract-zip": "1.6.0",
+    "q": "^1.4.1",
+    "serverless": "1.6.1"
+  }
+}

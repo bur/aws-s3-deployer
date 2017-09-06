@@ -11,7 +11,7 @@
 #
 # Happy Coding!
 
-service: kubra-aws-lambda-deployer
+service: aws-s3-deployer
 
 # You can pin your service to only deploy with a specific Serverless version
 # Check out our docs for more details

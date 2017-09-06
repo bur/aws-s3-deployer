@@ -1,7 +1,6 @@
-# AWS Lambda Deployer
+# AWS S3 Code Deployer
 
-The purpose of this lambda function (prepare yourselves) is specifically to deploy lambda functions. Those lambda functions must utilize the
-[Serverless Framework](https://serverless.com/framework/docs/ "Serverless Docs") in addition to AWS [CodeBuild](https://aws.amazon.com/documentation/codebuild/) / [CodePipeline](https://aws.amazon.com/documentation/codepipeline/). This is dependent upon the output artifacts produced during the CodeBuild step to include the lambda deployment artifacts (jar or zip files) and the serverless.yml + any file dependencies the serverless.yml may reference.
+The purpose of this lambda function is specifically to deploy s3 output artifacts from AWS Code Build. Those output artifacts utilize AWS [CodeBuild](https://aws.amazon.com/documentation/codebuild/) / [CodePipeline](https://aws.amazon.com/documentation/codepipeline/). This is dependent upon the output artifacts produced during the CodeBuild step to include the s3 distribution content deployment artifacts as a zip file which will be unziped and uploaded.
 
 # Getting Started
 Run `npm install` to load the dependencies.

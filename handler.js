@@ -4,6 +4,9 @@ const fs = require('fs');
 const extract = require('extract-zip');
 const Q = require('q');
 const cp = require('child_process');
+const s3 = require('s3');
+const async = require('async');
+
 const tmpDirectory = '/tmp/'
 
 process.env['PATH'] = process.env['PATH'] + ':' + process.env['LAMBDA_TASK_ROOT']
@@ -13,42 +16,45 @@ module.exports.deployer = (event, context, callback) => {
 
         AWS.config.update(event["CodePipeline.job"].data.artifactCredentials);
     }
+    var artifactZipName = process.env.ARTIFACT_ZIP_NAME; 
 
     var s3 = new AWS.S3({
         "signatureVersion": "v4"
     });
     var stage = event["CodePipeline.job"].data.actionConfiguration.configuration.UserParameters;
+    
     for (var i = 0; i < event["CodePipeline.job"].data.inputArtifacts.length; i++) {
         var inputArtifact = event["CodePipeline.job"].data.inputArtifacts[i];
 
         getFileFromS3(s3, inputArtifact.location.s3Location.objectKey, inputArtifact.location.s3Location.bucketName).then(
-                function(zipLocation) {
-                    return extractZip(zipLocation);
-                },
-                function(error) {
-                    return context.fail(generateError(503, 503, 'Stacktrace: ' + error, 'We are currently experiencing a technical issue and will be back up as soon as possible.'));
-                }
+            function (zipLocation) {
+                return extractZip(zipLocation);
+            },
+            function (error) {
+                return context.fail(generateError(503, 503, 'Stacktrace: ' + error, 'We are currently experiencing a technical issue and will be back up as soon as possible.'));
+            }
+        ).then(
+            function (extractLocationZip) {
+                return extractZip(extractLocationZip + "/" + artifactZipName + ".zip");
+            },
+            function (error) {
+                return context.fail(generateError(503, 503, 'Stacktrace: ' + error, 'We are currently experiencing a technical issue and will be back up as soon as possible.'));
+            }
             ).then(
-                function(extractLocation) {
-                    return createServerlessSymlink(extractLocation);
-                },
-                function(error) {
-                    return context.fail(generateError(503, 503, 'Stacktrace: ' + error, 'We are currently experiencing a technical issue and will be back up as soon as possible.'));
-                }).then(
-                function(extractLocation) {
-                    return executeServerless(extractLocation, stage, event.isTest);
-                },
-                function(error) {
-                    return context.fail(generateError(503, 503, 'Stacktrace: ' + error, 'We are currently experiencing a technical issue and will be back up as soon as possible.'));
-                }
+            function (extractLocationDist) {
+                return putDirectoryToS3(extractLocationDist + "/"+artifactZipName+"/", s3, process.env[stage + '_BUCKET']);
+            },
+            function (error) {
+                return context.fail(generateError(503, 503, 'Stacktrace: ' + error, 'We are currently experiencing a technical issue and will be back up as soon as possible.'));
+            }
             ).then(
-                function() {
-                    return context.succeed("Completed Successfully");
-                },
-                function(error) {
-                    return context.fail(generateError(503, 503, 'Stacktrace: ' + error, 'We are currently experiencing a technical issue and will be back up as soon as possible.'));
-                }
-            ).catch(function(error) {
+            function () {
+                return context.succeed("Completed Successfully");
+            },
+            function (error) {
+                return context.fail(generateError(503, 503, 'Stacktrace: ' + error, 'We are currently experiencing a technical issue and will be back up as soon as possible.'));
+            }
+            ).catch(function (error) {
                 return context.fail(generateError(503, 503, 'Stacktrace: ' + error, 'We are currently experiencing a technical issue and will be back up as soon as possible.'));
             })
             .done()
@@ -56,7 +62,7 @@ module.exports.deployer = (event, context, callback) => {
 
 };
 
-var getFileFromS3 = function(s3, key, bucket) {
+var getFileFromS3 = function (s3, key, bucket) {
     console.log('Getting file from S3...');
     var filename = key.split('/')[key.split('/').length - 1];
     var deferred = Q.defer();
@@ -72,7 +78,7 @@ var getFileFromS3 = function(s3, key, bucket) {
     }
 
     var wstream = fs.createWriteStream(target);
-    wstream.on('finish', function() {
+    wstream.on('finish', function () {
         // do stuff
         console.log("Downloads done.");
         deferred.resolve(target);
@@ -81,7 +87,7 @@ var getFileFromS3 = function(s3, key, bucket) {
     return deferred.promise;
 }
 
-var extractZip = function(zipLocation) {
+var extractZip = function (zipLocation) {
     var deferred = Q.defer();
     var extractLocation = null;
     if (zipLocation.indexOf('.zip') !== -1) {
@@ -93,7 +99,7 @@ var extractZip = function(zipLocation) {
 
     extract(source, {
         dir: extractLocation
-    }, function(err) {
+    }, function (err) {
         console.log('unzips done.');
 
         deferred.resolve(extractLocation);
@@ -101,40 +107,43 @@ var extractZip = function(zipLocation) {
     return deferred.promise;
 };
 
-var createServerlessSymlink = function(extractLocation) {
+var putDirectoryToS3 = function (extractionLocation, s3Client, bucket) {
+    console.log('Pushing deployment directory to S3... from ' + extractionLocation);
     var deferred = Q.defer();
-    fs.symlink(__dirname + '/node_modules/serverless/bin/serverless', extractLocation + '/serverless', function(err) {
-        console.log('symlink done.');
-        deferred.resolve(extractLocation);
-    });
-    return deferred.promise;
-}
 
-var executeServerless = function(extractLocation, stage, isTest) {
-    var deferred = Q.defer();
-    var serverlessCmd = 'deploy --stage ' + stage;
+    var options = {
+        s3Client: s3Client,
+    };
+    var client = s3.createClient(options);
 
-    if (isTest && isTest === true) {
-      serverlessCmd += ' -n'
+    var params = {
+        localDir: extractionLocation,
+        deleteRemoved: true,
+
+        s3Params: {
+            Bucket: bucket,
+            Prefix: ""
+
+        },
     };
 
-
-    cp.exec('./serverless ' + serverlessCmd, {
-        cwd: extractLocation
-    }, function(error, stdout, stderr) {
-        if (error) {
-            console.error(`exec error: ${error}`);
-            deferred.reject(new Error(err));
-        }
-        console.log(`stdout: ${stdout}`);
-        console.log(`stderr: ${stderr}`);
-        deferred.resolve(null);
+    var uploader = client.uploadDir(params);
+    uploader.on('error', function (err) {
+        console.error("unable to sync:", err.stack);
+        throw err;
+    });
+    uploader.on('progress', function () {
+        console.log("progress", uploader.progressAmount, uploader.progressTotal);
+    });
+    uploader.on('end', function () {
+        console.log("done uploading");
+        return deferred.resolve();
     });
 
     return deferred.promise;
 }
 
-var generateError = function(statusParam, errorCodeParam, developerMessageParam, userMessageParam) {
+var generateError = function (statusParam, errorCodeParam, developerMessageParam, userMessageParam) {
     var errorModel = {
         status: statusParam,
         errorCode: errorCodeParam,
